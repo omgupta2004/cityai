@@ -1,0 +1,16 @@
+{
+  "mode": "excel",
+  "steps": [
+    "no_ocr_binary_on_path",
+    "camelot_lattice_fallback"
+  ],
+  "tables_kept": 3,
+  "tables_dropped": 5,
+  "drop_reasons": {
+    "too_sparse": 5
+  },
+  "paths": {
+    "result": "C:\\Users\\omgup\\OneDrive\\Desktop\\CITYAI1\\CITYAI\\outputs\\aa051bac-e2a4-4cde-b320-e0f8a8bc9f85\\extracted.xlsx",
+    "tables_dir": "C:\\Users\\omgup\\OneDrive\\Desktop\\CITYAI1\\CITYAI\\outputs\\aa051bac-e2a4-4cde-b320-e0f8a8bc9f85\\tables"
+  }
+}

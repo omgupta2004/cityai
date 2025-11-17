@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Plotting & Styles</title>
+<style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.25rem;border-bottom:1px solid #e6eefc;background:#f7fbff}main{max-width:900px;margin:0 auto;padding:1rem} .card{border:1px solid #e6eefc;background:#f7fbff;border-radius:14px;padding:1rem} .btn{padding:.6rem 1rem;border:1px solid #2b88ff;border-radius:10px;background:#2b88ff;color:#fff;cursor:pointer}</style></head>
+<body><header><a href="/index.html">Bi(bli)oArch</a><nav><a href="/phase1.html">Phase 1</a></nav></header>
+<main><h2>Plotting & Styles</h2><div class="card">
+  <input id="file" type="file" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+  <button class="btn" id="run">Make Scatter</button>
+  <div id="out" style="margin-top:.6rem"></div>
+</div></main>
+<script>
+const $ = (s)=>document.querySelector(s);
+$('#run').onclick = async ()=>{
+  const f = $('#file').files[0]; if(!f){ alert('Select a file'); return; }
+  const fd = new FormData(); fd.append('file', f);
+  const r = await fetch('/api/plotting/run', {method:'POST', body:fd});
+  const j = await r.json();
+  if(!r.ok){ alert(j.error || 'Failed'); return; }
+  $('#out').innerHTML = `<a class="btn" href="${j.download}" target="_blank">Open PNG</a>`;
+};
+</script></body></html>
