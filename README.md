@@ -771,17 +771,3 @@ curl -X POST -F "file=@data.csv" \
 **Production:** https://arqave.cityai.space
 
 ---
-
-## License
-
-[Add your license here]
-
----
-
-## Contact
-
-For questions or issues, contact: [your email]
-
----
-
-**Last Updated:** November 28, 2024
