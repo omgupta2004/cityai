@@ -1,21 +1,218 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PCA Analysis</title>
-<style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.25rem;border-bottom:1px solid #e6eefc;background:#f7fbff}main{max-width:900px;margin:0 auto;padding:1rem} .card{border:1px solid #e6eefc;background:#f7fbff;border-radius:14px;padding:1rem} .btn{padding:.6rem 1rem;border:1px solid #2b88ff;border-radius:10px;background:#2b88ff;color:#fff;cursor:pointer}</style></head>
-<body><header><a href="/index.html">Bi(bli)oArch</a><nav><a href="/phase1.html">Phase 1</a></nav></header>
-<main><h2>PCA Analysis</h2><div class="card">
-  <input id="file" type="file" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
-  <label>Components</label> <input id="n" type="number" value="2" min="1" max="5" step="1">
-  <button class="btn" id="run">Run</button>
-  <div id="msg"></div><div id="out" style="margin-top:.6rem"></div>
-</div></main>
-<script>
-const $ = (s)=>document.querySelector(s);
-$('#run').onclick = async ()=>{
-  const f = $('#file').files[0]; if(!f){ alert('Select a file'); return; }
-  const n = Number($('#n').value)||2;
-  const fd = new FormData(); fd.append('file', f);
-  const r = await fetch('/api/pca/run?n_components='+n, {method:'POST', body:fd});
-  const j = await r.json();
-  if(!r.ok){ $('#msg').textContent = j.error || 'Failed'; return; }
-  $('#out').innerHTML = `<a class="btn" href="${j.download}">Download PCA result</a>`;
-};
-</script></body></html>
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PCA Analysis</title>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 0
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .85rem 1.25rem;
+      border-bottom: 1px solid #e6eefc;
+      background: #f7fbff
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem
+    }
+
+    .card {
+      border: 1px solid #e6eefc;
+      background: #f7fbff;
+      border-radius: 14px;
+      padding: 1.5rem
+    }
+
+    .btn {
+      padding: .6rem 1rem;
+      border: 1px solid #2b88ff;
+      border-radius: 10px;
+      background: #2b88ff;
+      color: #fff;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      border: none;
+      margin-right: .5rem;
+    }
+
+    .btn:hover {
+      background: #166fe0;
+    }
+
+    input[type="number"],
+    input[type="file"] {
+      padding: .5rem;
+      border: 1px solid #e6eefc;
+      border-radius: 10px;
+      margin: 0 .5rem;
+    }
+
+    .msg {
+      color: #5a6b83;
+      margin-top: 1rem;
+      font-size: .95rem;
+      padding: .5rem;
+      background: #f0f7ff;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .msg.show {
+      display: block;
+    }
+
+    .row {
+      display: flex;
+      gap: .8rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    label {
+      font-size: .95rem;
+      font-weight: 500;
+      min-width: 100px;
+    }
+
+    .plot-container {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+
+    .plot-container img {
+      max-width: 100%;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .downloads {
+      margin-top: 1rem;
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+
+    .variance-info {
+      margin-top: 1rem;
+      padding: .75rem;
+      background: #e8f5e9;
+      border-radius: 8px;
+      font-size: .9rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header><a href="/index.html">Arqave</a>
+    <nav><a href="/phase1.html">Phase 1</a></nav>
+  </header>
+  <main>
+    <h2>PCA Analysis</h2>
+    <div class="card">
+      <div class="row">
+        <label for="file">Upload File:</label>
+        <input id="file" type="file"
+          accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+      </div>
+
+      <div class="row">
+        <label for="n">Components:</label>
+        <input id="n" type="number" value="2" min="1" max="5" step="1">
+        <button class="btn" id="run">Run PCA</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+
+      <div id="variance" class="variance-info" style="display:none"></div>
+
+      <div id="plot" class="plot-container"></div>
+
+      <div id="downloads" class="downloads"></div>
+    </div>
+  </main>
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    $('#run').onclick = async () => {
+      const f = $('#file').files[0];
+      if (!f) {
+        $('#msg').textContent = 'Please select a CSV or Excel file first.';
+        $('#msg').className = 'msg show';
+        return;
+      }
+
+      const n = Number($('#n').value) || 2;
+
+      // Validate n
+      if (n < 1 || n > 5) {
+        $('#msg').textContent = 'Number of components must be between 1 and 5.';
+        $('#msg').className = 'msg show';
+        return;
+      }
+
+      $('#msg').textContent = 'Processing PCA...';
+      $('#msg').className = 'msg show';
+      $('#plot').innerHTML = '';
+      $('#downloads').innerHTML = '';
+      $('#variance').style.display = 'none';
+
+      const fd = new FormData();
+      fd.append('file', f);
+
+      try {
+        const r = await fetch('/api/pca/run?n_components=' + n, { method: 'POST', body: fd });
+        const j = await r.json();
+
+        if (!r.ok) {
+          $('#msg').textContent = j.error || 'PCA failed';
+          $('#msg').className = 'msg show';
+          return;
+        }
+
+        // Show success message
+        const variance = j.metadata.explained_variance;
+        const cumulative = j.metadata.cumulative_variance;
+        let msg = `✓ PCA completed on ${j.metadata.n_samples} samples using ${j.metadata.columns_used.length} columns.`;
+        $('#msg').textContent = msg;
+        $('#msg').className = 'msg show';
+
+        // Show variance info
+        let varianceHtml = '<strong>Explained Variance:</strong><br>';
+        for (let i = 0; i < variance.length; i++) {
+          varianceHtml += `PC${i + 1}: ${(variance[i] * 100).toFixed(1)}% (Cumulative: ${(cumulative[i] * 100).toFixed(1)}%)<br>`;
+        }
+        $('#variance').innerHTML = varianceHtml;
+        $('#variance').style.display = 'block';
+
+        // Show plot
+        if (j.plot_base64) {
+          $('#plot').innerHTML = `<img src="data:image/png;base64,${j.plot_base64}" alt="PCA Plot">`;
+        }
+
+        // Show download buttons
+        $('#downloads').innerHTML = `
+          <a class="btn" href="${j.download_scores}">Download Scores CSV</a>
+          <a class="btn" href="${j.download_loadings}">Download Loadings CSV</a>
+          <a class="btn" href="${j.download_plot}">Download Plot PNG</a>
+        `;
+      } catch (e) {
+        $('#msg').textContent = 'Network error: ' + e.message;
+        $('#msg').className = 'msg show';
+      }
+    };
+  </script>
+</body>
+
+</html>

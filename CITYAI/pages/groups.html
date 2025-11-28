@@ -1,22 +1,158 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Group Building</title>
-<style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.25rem;border-bottom:1px solid #e6eefc;background:#f7fbff}main{max-width:900px;margin:0 auto;padding:1rem} .card{border:1px solid #e6eefc;background:#f7fbff;border-radius:14px;padding:1rem} .btn{padding:.6rem 1rem;border:1px solid #2b88ff;border-radius:10px;background:#2b88ff;color:#fff;cursor:pointer} .msg{color:#5a6b83;margin-top:.5rem}</style></head>
-<body><header><a href="/index.html">Bi(bli)oArch</a><nav><a href="/phase1.html">Phase 1</a></nav></header>
-<main><h2>Group Building</h2><div class="card">
-  <input id="file" type="file" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
-  <button class="btn" id="run">Run</button>
-  <div id="msg" class="msg"></div>
-  <div id="out" style="margin-top:.6rem"></div>
-</div></main>
-<script>
-const $ = (s)=>document.querySelector(s);
-$('#run').onclick = async ()=>{
-  const f = $('#file').files[0]; if(!f){ $('#msg').textContent='Select a CSV/XLSX'; return; }
-  $('#msg').textContent='Processing...';
-  const fd = new FormData(); fd.append('file', f);
-  const r = await fetch('/api/groups/run', {method:'POST', body:fd});
-  const j = await r.json();
-  if(!r.ok){ $('#msg').textContent = j.error || 'Failed'; return; }
-  $('#msg').textContent='Done.';
-  $('#out').innerHTML = `<a class="btn" href="${j.download}">Download grouped Excel</a>`;
-};
-</script></body></html>
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Group Building</title>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 0
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .85rem 1.25rem;
+      border-bottom: 1px solid #e6eefc;
+      background: #f7fbff
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem
+    }
+
+    .card {
+      border: 1px solid #e6eefc;
+      background: #f7fbff;
+      border-radius: 14px;
+      padding: 1rem
+    }
+
+    .btn {
+      padding: .6rem 1rem;
+      border: 1px solid #2b88ff;
+      border-radius: 10px;
+      background: #2b88ff;
+      color: #fff;
+      cursor: pointer
+    }
+
+    .msg {
+      color: #5a6b83;
+      margin-top: .5rem
+    }
+  </style>
+</head>
+
+<body>
+  <header><a href="/index.html">Arqave</a>
+    <nav><a href="/phase1.html">Phase 1</a></nav>
+  </header>
+  <main>
+    <h2>Group Building</h2>
+    <div class="card">
+      <section id="data-source" class="card" style="margin:1rem 0;">
+        <div class="row">
+          <label>Category</label>
+          <select id="dsCategory">
+            <option>Slag</option>
+            <option>Glass</option>
+            <option>Ceramics</option>
+          </select>
+
+          <label>Job</label>
+          <select id="dsJob"></select>
+
+          <label>CSV</label>
+          <select id="dsFile"></select>
+
+          <button class="btn" id="useBtn">Use</button>
+          <span class="hint" id="dsMsg"></span>
+        </div>
+      </section>
+
+      <input id="file" type="file"
+        accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+      <button class="btn" id="run">Run</button>
+      <div id="msg" class="msg"></div>
+      <div id="out" style="margin-top:.6rem"></div>
+    </div>
+  </main>
+  <script>
+    (async function () {
+      const catEl = document.getElementById('dsCategory');
+      const jobEl = document.getElementById('dsJob');
+      const fileEl = document.getElementById('dsFile');
+      const useBtn = document.getElementById('useBtn');
+      const dsMsg = document.getElementById('dsMsg');
+
+      async function loadJobs() {
+        const r = await fetch(`/api/files/${encodeURIComponent(catEl.value)}/jobs`);
+        const j = await r.json();
+        jobEl.innerHTML = '';
+        j.jobs.forEach(x => {
+          const opt = document.createElement('option');
+          opt.value = x.job_id; opt.textContent = x.job_id;
+          jobEl.appendChild(opt);
+        });
+        if (j.jobs.length) { await loadFiles(); } else { fileEl.innerHTML = ''; }
+      }
+
+      async function loadFiles() {
+        const job = jobEl.value;
+        const r = await fetch(`/api/files/${encodeURIComponent(catEl.value)}/${encodeURIComponent(job)}/csvs`);
+        const j = await r.json();
+        fileEl.innerHTML = '';
+        j.csvs.forEach(x => {
+          const opt = document.createElement('option');
+          opt.value = x.path; opt.textContent = x.name;
+          fileEl.appendChild(opt);
+        });
+      }
+
+      catEl.addEventListener('change', loadJobs);
+      jobEl.addEventListener('change', loadFiles);
+
+      useBtn.addEventListener('click', async () => {
+        const cat = catEl.value, job = jobEl.value, file = fileEl.value;
+        if (!cat || !job || !file) { dsMsg.textContent = 'Select category, job and CSV.'; return; }
+        try {
+          const url = `/api/files/${encodeURIComponent(cat)}/${encodeURIComponent(job)}/csvs/${encodeURIComponent(file)}`;
+          const res = await fetch(url);
+          if (!res.ok) { dsMsg.textContent = 'Unable to fetch CSV'; return; }
+          const csvText = await res.text();
+          dsMsg.textContent = `Loaded ${file} (${csvText.length} chars)`;
+
+          // TODO: invoke this page's function with csvText or url
+          // Example: parse CSV here then call renderChart(data) or runPCA(data)
+          // const data = Papa.parse(csvText, {header:true}).data; // if using PapaParse
+          // renderYourFeature(data);
+
+        } catch (e) {
+          dsMsg.textContent = 'Error loading CSV';
+        }
+      });
+
+      await loadJobs();
+    })();
+
+    const $ = (s) => document.querySelector(s);
+    $('#run').onclick = async () => {
+      const f = $('#file').files[0]; if (!f) { $('#msg').textContent = 'Select a CSV/XLSX'; return; }
+      $('#msg').textContent = 'Processing...';
+      const fd = new FormData(); fd.append('file', f);
+      const r = await fetch('/api/groups/run', { method: 'POST', body: fd });
+      const j = await r.json();
+      if (!r.ok) { $('#msg').textContent = j.error || 'Failed'; return; }
+      $('#msg').textContent = 'Done.';
+      $('#out').innerHTML = `<a class="btn" href="${j.download}">Download grouped Excel</a>`;
+    };
+  </script>
+</body>
+
+</html>

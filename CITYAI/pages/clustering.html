@@ -1,22 +1,186 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cluster Analysis</title>
-<style>body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0}header{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.25rem;border-bottom:1px solid #e6eefc;background:#f7fbff}main{max-width:900px;margin:0 auto;padding:1rem} .card{border:1px solid #e6eefc;background:#f7fbff;border-radius:14px;padding:1rem} .btn{padding:.6rem 1rem;border:1px solid #2b88ff;border-radius:10px;background:#2b88ff;color:#fff;cursor:pointer} input[type="number"]{padding:.4rem .5rem;border:1px solid #e6eefc;border-radius:10px}</style></head>
-<body><header><a href="/index.html">Bi(bli)oArch</a><nav><a href="/phase1.html">Phase 1</a></nav></header>
-<main><h2>Cluster Analysis</h2><div class="card">
-  <input id="file" type="file" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
-  <label>k</label> <input id="k" type="number" value="3" min="2" max="10" step="1">
-  <button class="btn" id="run">Run</button>
-  <div id="msg" class="msg"></div>
-  <div id="out" style="margin-top:.6rem"></div>
-</div></main>
-<script>
-const $ = (s)=>document.querySelector(s);
-$('#run').onclick = async ()=>{
-  const f = $('#file').files[0]; if(!f){ alert('Select a file'); return; }
-  const k = Number($('#k').value)||3;
-  const fd = new FormData(); fd.append('file', f);
-  const r = await fetch('/api/clustering/run?n_clusters='+k, {method:'POST', body:fd});
-  const j = await r.json();
-  if(!r.ok){ $('#msg').textContent = j.error || 'Failed'; return; }
-  $('#out').innerHTML = `<a class="btn" href="${j.download}">Download with clusters</a>`;
-};
-</script></body></html>
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cluster Analysis</title>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 0
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .85rem 1.25rem;
+      border-bottom: 1px solid #e6eefc;
+      background: #f7fbff
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem
+    }
+
+    .card {
+      border: 1px solid #e6eefc;
+      background: #f7fbff;
+      border-radius: 14px;
+      padding: 1.5rem
+    }
+
+    .btn {
+      padding: .6rem 1rem;
+      border: 1px solid #2b88ff;
+      border-radius: 10px;
+      background: #2b88ff;
+      color: #fff;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      border: none;
+    }
+
+    .btn:hover {
+      background: #166fe0;
+    }
+
+    input[type="number"],
+    input[type="file"],
+    select {
+      padding: .5rem;
+      border: 1px solid #e6eefc;
+      border-radius: 10px;
+      margin: 0 .5rem;
+    }
+
+    .msg {
+      color: #5a6b83;
+      margin-top: 1rem;
+      font-size: .95rem;
+      padding: .5rem;
+      background: #f0f7ff;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .msg.show {
+      display: block;
+    }
+
+    .row {
+      display: flex;
+      gap: .8rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    label {
+      font-size: .95rem;
+      font-weight: 500;
+      min-width: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <header><a href="/index.html">Arqave</a>
+    <nav><a href="/phase1.html">Phase 1</a></nav>
+  </header>
+  <main>
+    <h2>Cluster Analysis</h2>
+    <div class="card">
+      <div class="row">
+        <label for="file">Upload File:</label>
+        <input id="file" type="file"
+          accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+      </div>
+
+      <div class="row">
+        <label for="algo">Algorithm:</label>
+        <select id="algo">
+          <option value="KMeans">KMeans</option>
+          <option value="Agglomerative">Agglomerative (Hierarchical)</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label for="k">Clusters (k):</label>
+        <input id="k" type="number" value="3" min="2" max="10" step="1">
+        <button class="btn" id="run">Run Clustering</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+      <div id="out" style="margin-top:1rem"></div>
+    </div>
+  </main>
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    $('#run').onclick = async () => {
+      const f = $('#file').files[0];
+      if (!f) {
+        $('#msg').textContent = 'Please select a CSV or Excel file first.';
+        $('#msg').className = 'msg show';
+        return;
+      }
+
+      const k = Number($('#k').value) || 3;
+      const algo = $('#algo').value;
+
+      if (k < 2 || k > 10) {
+        $('#msg').textContent = 'Number of clusters must be between 2 and 10.';
+        $('#msg').className = 'msg show';
+        return;
+      }
+
+      $('#msg').textContent = `Processing ${algo} clustering...`;
+      $('#msg').className = 'msg show';
+      $('#out').innerHTML = '';
+
+      const fd = new FormData();
+      fd.append('file', f);
+
+      try {
+        const r = await fetch(`/api/clustering/run?n_clusters=${k}&algo=${algo}`, { method: 'POST', body: fd });
+        const j = await r.json();
+
+        if (!r.ok) {
+          $('#msg').textContent = j.error || 'Clustering failed';
+          $('#msg').className = 'msg show';
+          return;
+        }
+
+        let msg = `✓ Clustered ${j.metadata.n_samples} samples into ${j.metadata.n_clusters} clusters using ${j.metadata.algorithm}.`;
+        if (j.metadata.columns_used && j.metadata.columns_used.length > 0) {
+          msg += ` Used columns: ${j.metadata.columns_used.join(', ')}.`;
+        }
+        $('#msg').textContent = msg;
+        $('#msg').className = 'msg show';
+
+        // Display plot and download buttons
+        $('#out').innerHTML = `
+          <div style="margin-top: 1rem;">
+            <img src="data:image/png;base64,${j.plot_base64}" 
+                 style="max-width: 100%; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" 
+                 alt="Cluster visualization">
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <a class="btn" href="${j.download}">Download Clustered CSV</a>
+            <a class="btn" href="${j.download_plot}">Download Plot PNG</a>
+          </div>
+        `;
+      } catch (e) {
+        $('#msg').textContent = 'Network error: ' + e.message;
+        $('#msg').className = 'msg show';
+      }
+    };
+  </script>
+</body>
+
+</html>
