@@ -44,25 +44,6 @@ def db():
     conn.row_factory = sqlite3.Row
     return conn
 
-
-def init_db():
-    conn = db()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS uploads(
-            id TEXT PRIMARY KEY,
-            filename TEXT NOT NULL,
-            pdf_path TEXT NOT NULL,
-            excel_path TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at TEXT,
-            error_msg TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
 init_db()
 
 
@@ -82,11 +63,11 @@ def health():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def update_status(job_id: str, status: str, excel_path: str | None = None, error: str | None = None):
+def update_status(job_id: str, status: str, excel_path: str | None = None, error: str | None = None, details: str | None = None):
     conn = db()
     c = conn.cursor()
-    c.execute("UPDATE uploads SET status=?, excel_path=?, error_msg=? WHERE id=?",
-              (status, excel_path, error, job_id))
+    c.execute("UPDATE uploads SET status=?, excel_path=?, error_msg=?, extraction_details=? WHERE id=?",
+              (status, excel_path, error, details, job_id))
     conn.commit()
     conn.close()
 
@@ -100,7 +81,14 @@ def worker(job_id: str, pdf_path: str):
             mode="excel",
             pages="all",
         )
-        update_status(job_id, "verified", excel_path=result["result_path"])
+        # Store extraction details as JSON
+        import json
+        details = json.dumps({
+            "tables_extracted": result.get("tables", 0),
+            "tables_dropped": result.get("tables_dropped", 0),
+            "drop_reasons": result.get("drop_reasons", {})
+        })
+        update_status(job_id, "verified", excel_path=result["result_path"], details=details)
     except Exception as e:
         update_status(job_id, "rejected", error=str(e))
 
@@ -133,7 +121,23 @@ async def status(job_id: str):
     conn.close()
     if not row:
         return JSONResponse({"error": "Job not found"}, status_code=404)
-    return {"job_id": job_id, "status": row["status"], "filename": row["filename"], "error": row["error_msg"]}
+    
+    # Parse extraction details if available
+    import json
+    details = None
+    if row["extraction_details"]:
+        try:
+            details = json.loads(row["extraction_details"])
+        except:
+            pass
+    
+    return {
+        "job_id": job_id, 
+        "status": row["status"], 
+        "filename": row["filename"], 
+        "error": row["error_msg"],
+        "extraction_details": details
+    }
 
 
 @app.get("/api/pdf/jobs/{job_id}/download")

@@ -42,7 +42,7 @@ def _normalize_cell(val):
 
 def normalize_df_tokens(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-    out = out.applymap(_normalize_cell)
+    out = out.map(_normalize_cell)  # Updated from applymap (deprecated in pandas 2.1+)
     return out
 
 def try_cast_numeric(df: pd.DataFrame) -> pd.DataFrame:
@@ -76,11 +76,6 @@ def passes_basic_table_filters(df: pd.DataFrame) -> Tuple[bool, str]:
         noise = sum(bool(NOISE_RE.match(str(x))) for x in non_empty)
         if noise / len(non_empty) > 0.30:
             return False, "punctuation_noise"
-
-    # weak headers
-    header_mean_len = df.iloc[0].fillna("").astype(str).str.len().mean()
-    if header_mean_len < 2:
-        return False, "short_headers"
 
     return True, "ok"
 
@@ -200,10 +195,20 @@ def extract_pdf_with_ocr(
     if mode == "excel":
         out_xlsx = job_dir / "extracted.xlsx"
         with pd.ExcelWriter(out_xlsx, engine="openpyxl") as writer:
-            for i, df in enumerate(kept, start=1):
-                df.to_excel(writer, index=False, sheet_name=f"Table_{i}")
             if kept:
+                # Write extracted tables
+                for i, df in enumerate(kept, start=1):
+                    df.to_excel(writer, index=False, sheet_name=f"Table_{i}")
+                # Write combined sheet
                 pd.concat(kept, ignore_index=True).to_excel(writer, index=False, sheet_name="Combined")
+            else:
+                # No tables extracted - create placeholder sheet
+                placeholder_df = pd.DataFrame({
+                    "Message": ["No tables were extracted from this PDF"],
+                    "Reason": ["All detected tables failed quality filters"],
+                    "Suggestion": ["Try a different PDF or check the manifest.json for details"]
+                })
+                placeholder_df.to_excel(writer, index=False, sheet_name="No_Tables_Found")
         result_path = out_xlsx
     else:
         import zipfile
@@ -216,4 +221,11 @@ def extract_pdf_with_ocr(
     manifest["paths"]["result"] = str(result_path)
     manifest["paths"]["tables_dir"] = str(tables_dir)
     (job_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
-    return {"tables": len(kept), "result_path": str(result_path), "mode": mode}
+    
+    return {
+        "tables": len(kept), 
+        "result_path": str(result_path), 
+        "mode": mode,
+        "tables_dropped": dropped,
+        "drop_reasons": drop_reasons
+    }
